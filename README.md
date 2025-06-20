@@ -1,1 +1,3 @@
 # AI-Resume-Matcher
+AI Resume Matcher is a Streamlit-based intelligent resume analysis tool leveraging Gemini 2.0 and LangChain to automate resume evaluation and job-fit scoring. It integrates FAISS for efficient semantic search and uses custom PromptTemplates with Pydantic to deliver structured, section-wise feedback (skills, strengths, gaps). Designed to assist job seekers and recruiters alike by offering actionable insights with real-time AI-driven analysis.
+Check out the app: https://ai-resumematcher.streamlit.app/ (If the app doesn't open, click on wakeup on site and it will open up within a short time.)
