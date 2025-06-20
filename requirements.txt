@@ -6,4 +6,4 @@ langchain-core
 pydantic
 python-dotenv
 faiss-cpu
-PyPDF2
+pypdf
