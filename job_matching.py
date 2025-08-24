@@ -9,6 +9,13 @@ from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 import tempfile
 import os
+import asyncio
+
+# === Fix: Ensure event loop for async gRPC ===
+try:
+    asyncio.get_running_loop()
+except RuntimeError:
+    asyncio.set_event_loop(asyncio.new_event_loop())
 
 # === Load API Keys ===
 load_dotenv()
@@ -21,8 +28,13 @@ uploaded_file = st.file_uploader("📤 Upload your Resume (PDF)", type=["pdf"])
 job_description_text = st.text_area("📝 Paste the Job Description", height=200)
 
 # === Utility: Format points nicely ===
-def format_points(text):
-    return text.replace("1.", "\n1.").replace("2.", "\n2.").replace("3.", "\n3.").replace("4.", "\n4.")
+def format_points(text: str) -> str:
+    return (
+        text.replace("1.", "\n1.")
+        .replace("2.", "\n2.")
+        .replace("3.", "\n3.")
+        .replace("4.", "\n4.")
+    )
 
 # === Define Output Model ===
 class ResumeMatchFeedback(BaseModel):
@@ -34,7 +46,9 @@ class ResumeMatchFeedback(BaseModel):
     Recommendations: str = Field(description="Improvement suggestions with examples")
     NotImpactful: str = Field(description="Lines in the resume that are not effective")
     Recommended_projects: str = Field(description="Project ideas relevant to the job")
-    Key_changes: str = Field(description="Suggested line rewrites: Before → After format rember to add arrow and next line")
+    Key_changes: str = Field(
+        description="Suggested line rewrites: Before → After format rember to add arrow and next line"
+    )
 
 # === Process Resume & Match ===
 if uploaded_file and job_description_text and st.button("🔍 Analyze Resume"):
@@ -60,13 +74,15 @@ if uploaded_file and job_description_text and st.button("🔍 Analyze Resume"):
 
     # Retrieve relevant resume content
     retriever = resume_store.as_retriever(search_type="similarity", search_kwargs={"k": 12})
-    relevant_chunks = retriever.invoke("Find content in the resume related to this job description.")
+    relevant_chunks = retriever.invoke(
+        "Find content in the resume related to this job description."
+    )
     relevant_resume_text = "\n".join([doc.page_content for doc in relevant_chunks])
     job_text = "\n".join([doc.page_content for doc in job_chunks])
 
     # Prompt Template
     prompt = PromptTemplate(
-        template = """
+        template="""
 Rate how well this resume fits the following job.
 
 ### Job Description:
@@ -89,7 +105,7 @@ Respond in the following sections:
 - Recommended_projects: bullet points.
 - Key_changes: show 'Before:' and 'After:' for lines that should change and add arrow '->' example : before : .... \t -> \t after: ... next before after pair in next line.
 """,
-        input_variables=["job", "resume"]
+        input_variables=["job", "resume"],
     )
 
     # LLM and chain
@@ -99,10 +115,7 @@ Respond in the following sections:
 
     # Invoke model
     with st.spinner("Analyzing resume..."):
-        result = chain.invoke({
-            "job": job_text,
-            "resume": relevant_resume_text
-        })
+        result = chain.invoke({"job": job_text, "resume": relevant_resume_text})
 
     # Clean up
     os.remove(temp_path)
@@ -110,6 +123,7 @@ Respond in the following sections:
     # === Display Results ===
     st.subheader("📊 Matching Results")
     st.markdown(f"**🎯 Rating:** {result.Rating}")
+
     st.markdown("**✅ Strengths:**")
     st.markdown(format_points(result.Strength))
 
@@ -120,10 +134,18 @@ Respond in the following sections:
     st.markdown(format_points(result.Recommendations))
 
     st.markdown("**🚫 Not Impactful Lines:**")
-    st.markdown(format_points(result.NotImpactful) if result.NotImpactful != "N/A" else "_No non-impactful lines found._")
+    st.markdown(
+        format_points(result.NotImpactful)
+        if result.NotImpactful != "N/A"
+        else "_No non-impactful lines found._"
+    )
 
     st.markdown("**🧪 Recommended Projects:**")
     st.markdown(format_points(result.Recommended_projects))
 
     st.markdown("**✏️ Key Changes (Before → After):**")
-    st.markdown(format_points(result.Key_changes) if result.Key_changes != "N/A" else "_No specific changes recommended._")
+    st.markdown(
+        format_points(result.Key_changes)
+        if result.Key_changes != "N/A"
+        else "_No specific changes recommended._"
+    )
