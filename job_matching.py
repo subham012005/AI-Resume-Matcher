@@ -24,6 +24,15 @@ load_dotenv()
 st.set_page_config(page_title="AI Resume Matcher", layout="centered")
 st.title("📄 AI Resume Matcher with Gemini")
 
+# Retrieve API key from environment/dotenv
+api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+
+if not api_key:
+    st.sidebar.warning("⚠️ API Key not found in environment or .env file.")
+    api_key = st.sidebar.text_input("Enter Google/Gemini API Key", type="password")
+    if api_key:
+        os.environ["GOOGLE_API_KEY"] = api_key
+
 uploaded_file = st.file_uploader("📤 Upload your Resume (PDF)", type=["pdf"])
 job_description_text = st.text_area("📝 Paste the Job Description", height=200)
 
@@ -52,6 +61,9 @@ class ResumeMatchFeedback(BaseModel):
 
 # === Process Resume & Match ===
 if uploaded_file and job_description_text and st.button("🔍 Analyze Resume"):
+    if not os.environ.get("GOOGLE_API_KEY"):
+        st.error("🔑 Please provide a Gemini API Key in the sidebar or configure it in a .env file to run the analysis.")
+        st.stop()
 
     # Save PDF to temp file
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
@@ -69,7 +81,7 @@ if uploaded_file and job_description_text and st.button("🔍 Analyze Resume"):
     job_chunks = splitter.split_documents(job_doc)
 
     # Embeddings and FAISS store
-    embedding_model = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    embedding_model = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-2")
     resume_store = FAISS.from_documents(resume_chunks, embedding_model)
 
     # Retrieve relevant resume content
@@ -109,7 +121,7 @@ Respond in the following sections:
     )
 
     # LLM and chain
-    llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
     structured_model = llm.with_structured_output(ResumeMatchFeedback)
     chain = prompt | structured_model
 
